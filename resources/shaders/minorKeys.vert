@@ -65,8 +65,9 @@ void main(){
 	// Output position.
 	gl_Position = vec4(flipIfNeeded(noteSize * v + noteShift), 0.0 , 1.0) ;
 
-	// Discard keys that are too close to the screen edges.
-	if(abs(noteShift.x) >= 1.0 - 0.5 * noteWidth){
+	// Discard keys entirely off screen: one straddling the edge is cut in half
+	// by it, as a camera framing the same keys shows it.
+	if(abs(noteShift.x) >= 1.0 + 0.5 * noteSize.x){
 		gl_Position = vec4(-40000.0);
 	}
 	
