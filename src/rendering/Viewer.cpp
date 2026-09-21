@@ -2372,6 +2372,11 @@ void Viewer::setState(const State & state){
 		_state.particles.tex = loadTextureArray(state.particles.imagePaths, false, _state.particles.texCount);
 	}
 
+	if(!_state.score.digitsFontPath.empty()){
+		glDeleteTextures(1, &_state.score.digitsTex);
+		_state.score.digitsTex = loadTexture(_state.score.digitsFontPath[0], 4, false);
+	}
+
 	_state.score.bars.clear();
 	if(!_state.score.barsPath.empty()){
 		std::ifstream barsFile = System::openInputFile(_state.score.barsPath[0]);

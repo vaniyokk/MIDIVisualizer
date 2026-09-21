@@ -87,6 +87,8 @@ public:
 		bool vLines; ///< Show vertical score lines.
 		bool digits; ///< Show score text.
 		PathCollection barsPath; ///< Measures file (expect only one).
+		PathCollection digitsFontPath; ///< Digits image (expect only one).
+		GLuint digitsTex; ///< Loaded from digitsFontPath, 0 for the built-in digits.
 		std::vector<std::pair<double, int>> bars; ///< Measure start times and numbers, loaded from barsPath.
 	};
 	

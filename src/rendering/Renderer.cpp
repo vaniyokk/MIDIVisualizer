@@ -587,6 +587,7 @@ void Renderer::drawWaves(const std::shared_ptr<MIDIScene>& scene, float time, co
 void Renderer::drawScore(const std::shared_ptr<MIDIScene>& scene, float time, const glm::vec2 & invScreenSize, const State::ScoreState & state, float measureScale, float qualityScale, float keyboardHeight, bool horizontalMode, bool reverseScroll){
 
 	const glm::vec2 pixelSize = qualityScale * (horizontalMode ? glm::vec2(invScreenSize.y, invScreenSize.x) : invScreenSize);
+	const GLuint digitsTex = state.digitsTex != 0 ? state.digitsTex : _texFont;
 
 	// Draw vertical lines.
 	if(state.vLines){
@@ -649,7 +650,7 @@ void Renderer::drawScore(const std::shared_ptr<MIDIScene>& scene, float time, co
 				_programScoreLabels.uniform("color", state.digitsColor);
 				_programScoreLabels.uniform("maxDigitCount", digitCount);
 				_programScoreLabels.uniform("firstMeasure", bar.second);
-				_programScoreLabels.texture("font", _texFont, GL_TEXTURE_2D);
+				_programScoreLabels.texture("font", digitsTex, GL_TEXTURE_2D);
 				glDrawElementsInstanced(GL_TRIANGLES, int(_quadPrimitiveCount), GL_UNSIGNED_INT, (void*)0, 1);
 			}
 		}
@@ -726,7 +727,7 @@ void Renderer::drawScore(const std::shared_ptr<MIDIScene>& scene, float time, co
 			_programScoreLabels.uniform("color", state.digitsColor);
 			_programScoreLabels.uniform("maxDigitCount", int(digitCount));
 			_programScoreLabels.uniform("firstMeasure", firstMeasure);
-			_programScoreLabels.texture("font", _texFont, GL_TEXTURE_2D);
+			_programScoreLabels.texture("font", digitsTex, GL_TEXTURE_2D);
 			glBindVertexArray(_vaoQuad);
 			glDrawElementsInstanced(GL_TRIANGLES, int(_quadPrimitiveCount), GL_UNSIGNED_INT, (void*)0, barCount);
 			glBindVertexArray(0);

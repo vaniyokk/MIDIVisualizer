@@ -329,6 +329,8 @@ constexpr const char* s_color_bg_dsc 						= "Background color";
 
 constexpr const char* s_score_bars_path_key 				= "score-bars-path";
 constexpr const char* s_score_bars_path_dsc 				= "Text file of measures, one per line: start time in seconds, then the number to show or -1 for none. Replaces the measures spaced from the first tempo";
+constexpr const char* s_score_digits_font_path_key 		= "score-digits-font-path";
+constexpr const char* s_score_digits_font_path_dsc 		= "Image of the digits 0-4 over 5-9 in 200x256 cells, as distances outside (red) and inside (green) each glyph. Replaces the built-in digits";
 constexpr const char* s_bg_img_path_key 					= "bg-img-path";
 constexpr const char* s_bg_img_path_dsc 					= "Path to an image on disk to use as background";
 
