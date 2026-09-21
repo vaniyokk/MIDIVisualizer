@@ -612,7 +612,50 @@ void Renderer::drawScore(const std::shared_ptr<MIDIScene>& scene, float time, co
 		glUseProgram(0);
 	}
 
-	if(state.hLines || state.digits){
+	if((state.hLines || state.digits) && !state.bars.empty()){
+		const float direction = (reverseScroll ? -1.0f : 1.0f);
+		const float keyboardPos = 2.0f * keyboardHeight - 1.0f;
+
+		int maxNumber = 1;
+		for(const auto& bar : state.bars){
+			maxNumber = (std::max)(maxNumber, bar.second);
+		}
+		const int digitCount = int(std::floor(std::log10(float(maxNumber)))) + 1;
+		const glm::vec2 digitResolution = glm::vec2(200.0f, 256.0f);
+		const glm::vec2 digitSize = state.digitsScale * qualityScale * invScreenSize * digitResolution;
+		const glm::vec2 offset = 2.0f * digitSize * state.digitsOffset;
+		const glm::vec2 margin = horizontalMode ? glm::vec2(offset.y, offset.x) : offset;
+
+		glBindVertexArray(_vaoQuad);
+		for(const auto& bar : state.bars){
+			const float barCoord = direction * (float(bar.first) - time) * measureScale + keyboardPos;
+			// A line just past the edge can still have its number on screen.
+			if(std::abs(barCoord) > 1.5f){
+				continue;
+			}
+			if(state.hLines){
+				_programScoreBars.use();
+				_programScoreBars.uniform("baseOffset", glm::vec2(0.0f, barCoord));
+				_programScoreBars.uniform("nextOffset", glm::vec2(0.0f));
+				_programScoreBars.uniform("scale", glm::vec2(1.0f, state.hLinesWidth * pixelSize.y));
+				_programScoreBars.uniform("color", state.hLinesColor);
+				glDrawElementsInstanced(GL_TRIANGLES, int(_quadPrimitiveCount), GL_UNSIGNED_INT, (void*)0, 1);
+			}
+			if(state.digits){
+				_programScoreLabels.use();
+				_programScoreLabels.uniform("baseOffset", glm::vec2(-1.0f, barCoord) + margin);
+				_programScoreLabels.uniform("nextOffset", glm::vec2(0.0f));
+				_programScoreLabels.uniform("scale", digitSize);
+				_programScoreLabels.uniform("color", state.digitsColor);
+				_programScoreLabels.uniform("maxDigitCount", digitCount);
+				_programScoreLabels.uniform("firstMeasure", bar.second);
+				_programScoreLabels.texture("font", _texFont, GL_TEXTURE_2D);
+				glDrawElementsInstanced(GL_TRIANGLES, int(_quadPrimitiveCount), GL_UNSIGNED_INT, (void*)0, 1);
+			}
+		}
+		glBindVertexArray(0);
+		glUseProgram(0);
+	} else if(state.hLines || state.digits){
 
 		const float currentAbscisse = time/float(scene->secondsPerMeasure());
 

@@ -86,6 +86,8 @@ public:
 		bool hLines; ///< Show horizontal score lines.
 		bool vLines; ///< Show vertical score lines.
 		bool digits; ///< Show score text.
+		PathCollection barsPath; ///< Measures file (expect only one).
+		std::vector<std::pair<double, int>> bars; ///< Measure start times and numbers, loaded from barsPath.
 	};
 	
 	struct ParticlesState {

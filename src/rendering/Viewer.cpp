@@ -2372,6 +2372,16 @@ void Viewer::setState(const State & state){
 		_state.particles.tex = loadTextureArray(state.particles.imagePaths, false, _state.particles.texCount);
 	}
 
+	_state.score.bars.clear();
+	if(!_state.score.barsPath.empty()){
+		std::ifstream barsFile = System::openInputFile(_state.score.barsPath[0]);
+		double start;
+		int number;
+		while(barsFile >> start >> number){
+			_state.score.bars.emplace_back(start, number);
+		}
+	}
+
 	refreshPedalTextures(_state.pedals);
 
 	// Don't modify the rest of the potentially restored state.

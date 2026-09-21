@@ -276,6 +276,7 @@ void State::defineOptions(){
 	_sharedInfos[s_score_digits_size_key] 			= {Category::SCORE, s_score_digits_size_dsc, Type::FLOAT};
 	_sharedInfos[s_score_digits_offset_x_key] 		= {Category::SCORE, s_score_digits_offset_x_dsc, Type::FLOAT};
 	_sharedInfos[s_score_digits_offset_y_key] 		= {Category::SCORE, s_score_digits_offset_y_dsc, Type::FLOAT};
+	_sharedInfos[s_score_bars_path_key] 			= {Category::SCORE, s_score_bars_path_dsc, Type::PATH};
 
 	// Wave
 	_sharedInfos[s_wave_size_key] 				= {Category::WAVE, s_wave_size_dsc, Type::FLOAT, {0.0f, 5.0f}};
@@ -488,6 +489,7 @@ void State::updateOptions(){
 	_boolInfos[s_loop_key] = &loop;
 
 	_pathInfos[s_bg_img_path_key] = &background.imagePath;
+	_pathInfos[s_score_bars_path_key] = &score.barsPath;
 	_pathInfos[s_particles_paths_key] = &particles.imagePaths;
 
 	_pathInfos[s_notes_major_img_path_key] = &notes.majorImagePath;
@@ -870,6 +872,8 @@ void State::reset(){
 	score.vLinesWidth = 2.0f;
 	score.digitsScale = 0.08f;
 	score.digitsOffset = {0, 0};
+	score.barsPath.clear();
+	score.bars.clear();
 
 	particles.speed = 0.2f;
 	particles.expansion = 1.0f;

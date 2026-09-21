@@ -327,6 +327,8 @@ constexpr const char* s_bg_img_opacity_dsc 					= "Background opacity";
 constexpr const char* s_color_bg_key 						= "color-bg";
 constexpr const char* s_color_bg_dsc 						= "Background color";
 
+constexpr const char* s_score_bars_path_key 				= "score-bars-path";
+constexpr const char* s_score_bars_path_dsc 				= "Text file of measures, one per line: start time in seconds, then the number to show or -1 for none. Replaces the measures spaced from the first tempo";
 constexpr const char* s_bg_img_path_key 					= "bg-img-path";
 constexpr const char* s_bg_img_path_dsc 					= "Path to an image on disk to use as background";
 
