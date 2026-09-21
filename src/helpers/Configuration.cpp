@@ -120,6 +120,9 @@ Configuration::Configuration(const std::string& path, const std::vector<std::str
 			if(name == "bitrate" && vals.size() >= 1){
 				exporting.bitrate = (std::max)(Configuration::parseInt(vals[0]), 1);
 			}
+			if(name == "quality" && vals.size() >= 1){
+				exporting.quality = glm::clamp(Configuration::parseInt(vals[0]), 1, 100);
+			}
 			if(name == "postroll" && vals.size() >= 1){
 				exporting.postroll = Configuration::parseFloat(vals[0]);
 			}
@@ -136,6 +139,8 @@ Configuration::Configuration(const std::string& path, const std::vector<std::str
 					exporting.format = Export::Format::MPEG4;
 				} else if(vals[0] == "PRORES"){
 					exporting.format = Export::Format::PRORES;
+				} else if(vals[0] == "HEVC"){
+					exporting.format = Export::Format::HEVC;
 				}
 			}
 		}
@@ -282,9 +287,10 @@ void Configuration::printHelp(){
 
 	const std::vector<std::pair<std::string, std::string>> expOpts = {
 		{"export", "path to the output video (or directory for PNG)"},
-		{"format", "output format (values: PNG, MPEG2, MPEG4, PRORES)"},
+		{"format", "output format (values: PNG, MPEG2, MPEG4, PRORES, HEVC)"},
 		{"framerate", "number of frames per second to export (integer)"},
 		{"bitrate", "target video bitrate in Mb (integer)"},
+		{"quality", "constant quality for HEVC, encoded by VideoToolbox on macOS (1 to 100, default 80)"},
 		{"postroll", "Postroll time after the track, in seconds (number, default 10.0)"},
 		{"out-alpha", "use transparent output background, only for PNG and PRORES (1 or 0 to enable/disable)"},
 		{"fix-premultiply", "cancel alpha premultiplication, only when out-alpha is enabled (1 or 0 to enable/disable)"},

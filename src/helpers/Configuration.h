@@ -16,7 +16,7 @@ std::string join(const std::vector<std::string>& strs, const std::string& delim)
 struct Export {
 
 	enum class Format : int {
-		   PNG = 0, MPEG2 = 1, MPEG4 = 2, PRORES = 3
+		   PNG = 0, MPEG2 = 1, MPEG4 = 2, PRORES = 3, HEVC = 4
 	};
 
 	std::string path;
@@ -24,6 +24,7 @@ struct Export {
 	float postroll = 10.0f;
 	int framerate = 60;
 	int bitrate = 40;
+	int quality = 80;
 	bool fixPremultiply = false;
 	bool alphaBackground = false;
 

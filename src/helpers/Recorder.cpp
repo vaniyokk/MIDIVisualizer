@@ -106,7 +106,8 @@ void writeFrameToVideo(std::vector<GLubyte>* buffer, const glm::ivec2 size, bool
 #ifdef MIDIVIZ_SUPPORT_VIDEO
 	unsigned char * srcs[AV_NUM_DATA_POINTERS] = {0};
 	int strides[AV_NUM_DATA_POINTERS] = {0};
-	const bool storesAlpha = av_pix_fmt_desc_get(codecCtx->pix_fmt)->flags & AV_PIX_FMT_FLAG_ALPHA;
+	// VideoToolbox ignores the alpha of a BGRA frame unless asked to encode it.
+	const bool storesAlpha = swsContext && (av_pix_fmt_desc_get(codecCtx->pix_fmt)->flags & AV_PIX_FMT_FLAG_ALPHA);
 	if(exportNoBackground || storesAlpha){
 		convertImageInPlace(*buffer, size, exportNoBackground, cancelPremultiply);
 		srcs[0] = (unsigned char *)buffer->data();
@@ -117,8 +118,16 @@ void writeFrameToVideo(std::vector<GLubyte>* buffer, const glm::ivec2 size, bool
 		srcs[0] = (unsigned char *)buffer->data() + size_t(size[1] - 1) * size[0] * 4;
 		strides[0] = -int(size[0] * 4);
 	}
-	// Rescale and convert to the proper output layout.
-	sws_scale(swsContext, srcs, strides, 0, size[1], frame->data, frame->linesize);
+	if(swsContext){
+		// Rescale and convert to the proper output layout.
+		sws_scale(swsContext, srcs, strides, 0, size[1], frame->data, frame->linesize);
+	} else {
+		// VideoToolbox copies the frame into a pixel buffer of its own when the
+		// flush below encodes it, so it can read the readback buffer in place.
+		frame->buf[0] = av_buffer_create(buffer->data(), buffer->size(), [](void*, uint8_t*){}, nullptr, AV_BUFFER_FLAG_READONLY);
+		frame->data[0] = srcs[0];
+		frame->linesize[0] = strides[0];
+	}
 	// Send frame.
 	const int res = avcodec_send_frame(codecCtx, frame);
 	if(res == AVERROR(EAGAIN)){
@@ -132,6 +141,9 @@ void writeFrameToVideo(std::vector<GLubyte>* buffer, const glm::ivec2 size, bool
 	// A frame left waiting in the encoder's input makes the final
 	// avcodec_send_frame(nullptr) in endVideo fail with EAGAIN, and that frame is never written.
 	recorder->flush();
+	if(!swsContext){
+		av_buffer_unref(&frame->buf[0]);
+	}
 #endif
 }
 
@@ -141,7 +153,10 @@ Recorder::Recorder(){
 	#ifdef MIDIVIZ_SUPPORT_VIDEO
 		{"MPEG2", "mp4", Export::Format::MPEG2},
 		{"MPEG4", "mp4", Export::Format::MPEG4},
-		{"PRORES", "mov", Export::Format::PRORES}
+		{"PRORES", "mov", Export::Format::PRORES},
+	#ifdef __APPLE__
+		{"HEVC", "mp4", Export::Format::HEVC},
+	#endif
 	#endif
 	};
 
@@ -196,7 +211,8 @@ void Recorder::record(const std::shared_ptr<Framebuffer> & frame){
 
 	// Readback.
 	frame->bind();
-	glReadPixels(0, 0, (GLsizei)_size[0], (GLsizei)_size[1], GL_RGBA, GL_UNSIGNED_BYTE, _savingBuffers[buffIndex].data());
+	const GLenum readFormat = _config.format == Export::Format::HEVC ? GL_BGRA : GL_RGBA;
+	glReadPixels(0, 0, (GLsizei)_size[0], (GLsizei)_size[1], readFormat, GL_UNSIGNED_BYTE, _savingBuffers[buffIndex].data());
 	frame->unbind();
 
 	if(_config.format == Export::Format::PNG){
@@ -293,7 +309,15 @@ bool Recorder::drawGUI(float scale){
 			lineStarted = true;
 		}
 
-		if(_config.format != Export::Format::PNG){
+		if(_config.format == Export::Format::HEVC){
+			if(lineStarted){
+				ImGui::SameLine(scaledColumn);
+			}
+			if(ImGui::InputInt("Quality", &_config.quality)){
+				_config.quality = glm::clamp(_config.quality, 1, 100);
+			}
+			ImGui::helpTooltip("Set the video export quality, from 1 to 100");
+		} else if(_config.format != Export::Format::PNG){
 			if(lineStarted){
 				ImGui::SameLine(scaledColumn);
 			}
@@ -482,16 +506,19 @@ bool Recorder::initVideo(const std::string & path, Export::Format format, bool v
 	struct InternalCodecOpts {
 		AVCodecID avid;
 		AVPixelFormat avformat;
+		const char * encoder;
 	};
 	static const std::unordered_map<Export::Format, InternalCodecOpts> opts = {
-		{Export::Format::MPEG2, {AV_CODEC_ID_MPEG2VIDEO, AV_PIX_FMT_YUV422P}},
-		{Export::Format::MPEG4, {AV_CODEC_ID_MPEG4, AV_PIX_FMT_YUV420P}},
-		{Export::Format::PRORES, {AV_CODEC_ID_PRORES, AV_PIX_FMT_YUVA444P10}},
+		{Export::Format::MPEG2, {AV_CODEC_ID_MPEG2VIDEO, AV_PIX_FMT_YUV422P, nullptr}},
+		{Export::Format::MPEG4, {AV_CODEC_ID_MPEG4, AV_PIX_FMT_YUV420P, nullptr}},
+		{Export::Format::PRORES, {AV_CODEC_ID_PRORES, AV_PIX_FMT_YUVA444P10, nullptr}},
+		{Export::Format::HEVC, {AV_CODEC_ID_HEVC, AV_PIX_FMT_BGRA, "hevc_videotoolbox"}},
 	};
+	const bool encodesReadback = format == Export::Format::HEVC;
 
 	// Setup codec.
 	const auto & outFormat = opts.at(format);
-	_codec = avcodec_find_encoder(outFormat.avid);
+	_codec = outFormat.encoder ? avcodec_find_encoder_by_name(outFormat.encoder) : avcodec_find_encoder(outFormat.avid);
 	if(!_codec){
 		std::cerr << "[VIDEO]: Unable to find encoder." << std::endl;
 		return false;
@@ -530,6 +557,19 @@ bool Recorder::initVideo(const std::string & path, Export::Format format, bool v
 		av_opt_set_int(_codecCtx->priv_data, "bits_per_mb", 8000, 0);
 	}
 
+	if(format == Export::Format::HEVC){
+		_codecCtx->global_quality = _config.quality;
+		// FFmpeg picks VideoToolbox's input pixel format from this range, and
+		// only accepts BGRA as full range. The stream is still limited range,
+		// and is tagged so below.
+		_codecCtx->color_range = AVCOL_RANGE_JPEG;
+		// VideoToolbox converts the readback with the BT.709 matrix, but leaves
+		// the stream untagged unless told, and players then decode it as BT.601.
+		_codecCtx->colorspace = AVCOL_SPC_BT709;
+		_codecCtx->color_primaries = AVCOL_PRI_BT709;
+		_codecCtx->color_trc = AVCOL_TRC_BT709;
+	}
+
 	AVDictionary * codecParams = nullptr;
 	if(avcodec_open2(_codecCtx, _codec, &codecParams) < 0){
 		std::cerr << "[VIDEO]: Unable to open encoder." << std::endl;
@@ -550,6 +590,9 @@ bool Recorder::initVideo(const std::string & path, Export::Format format, bool v
 		std::cerr << "[VIDEO]: Unable to transfer parameters from encoder to stream." << std::endl;
 		return false;
 	}
+	if(format == Export::Format::HEVC){
+		_stream->codecpar->color_range = AVCOL_RANGE_MPEG;
+	}
 
 	// Allocate frames.
 	for(unsigned int i = 0; i < _frames.size(); ++i){
@@ -562,7 +605,7 @@ bool Recorder::initVideo(const std::string & path, Export::Format format, bool v
 		frame->width = _codecCtx->width;
 		frame->height = _codecCtx->height;
 		frame->pts = 0;
-		if(av_frame_get_buffer(frame, 0) < 0){
+		if(!encodesReadback && av_frame_get_buffer(frame, 0) < 0){
 			std::cerr << "[VIDEO]: Unable to create frame buffer." << std::endl;
 			return false;
 		}
@@ -580,7 +623,7 @@ bool Recorder::initVideo(const std::string & path, Export::Format format, bool v
 	}
 	
 	// Create scaling/conversion context.
-	for(unsigned int i = 0; i < _swsContexts.size(); ++i){
+	for(unsigned int i = 0; i < _swsContexts.size() && !encodesReadback; ++i){
 		_swsContexts[i] = sws_getContext(_size[0], _size[1], AV_PIX_FMT_RGBA, _codecCtx->width, _codecCtx->height, _codecCtx->pix_fmt, SWS_POINT, nullptr, nullptr, nullptr);
 		if(!_swsContexts[i]){
 			std::cerr << "[VIDEO]: Unable to create processing context." << std::endl;
