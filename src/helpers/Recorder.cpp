@@ -20,6 +20,7 @@ extern "C" {
 	#include <libavformat/avio.h>
 	#include <libswscale/swscale.h>
 	#include <libavutil/opt.h>
+	#include <libavutil/pixdesc.h>
 }
 #endif
 
@@ -103,12 +104,19 @@ void writePNGToPath(std::vector<GLubyte>* buffer, const glm::ivec2 size, bool ex
 
 void writeFrameToVideo(std::vector<GLubyte>* buffer, const glm::ivec2 size, bool exportNoBackground, bool cancelPremultiply, AVFrame* frame, SwsContext* swsContext, AVCodecContext* codecCtx, Recorder* recorder){
 #ifdef MIDIVIZ_SUPPORT_VIDEO
-	convertImageInPlace(*buffer, size, exportNoBackground, cancelPremultiply);
-
 	unsigned char * srcs[AV_NUM_DATA_POINTERS] = {0};
 	int strides[AV_NUM_DATA_POINTERS] = {0};
-	srcs[0] = (unsigned char *)buffer->data();
-	strides[0] = int(size[0] * 4);
+	const bool storesAlpha = av_pix_fmt_desc_get(codecCtx->pix_fmt)->flags & AV_PIX_FMT_FLAG_ALPHA;
+	if(exportNoBackground || storesAlpha){
+		convertImageInPlace(*buffer, size, exportNoBackground, cancelPremultiply);
+		srcs[0] = (unsigned char *)buffer->data();
+		strides[0] = int(size[0] * 4);
+	} else {
+		// The alpha channel is dropped, and walking the rows bottom-up does the
+		// flip, so the buffer is read as is.
+		srcs[0] = (unsigned char *)buffer->data() + size_t(size[1] - 1) * size[0] * 4;
+		strides[0] = -int(size[0] * 4);
+	}
 	// Rescale and convert to the proper output layout.
 	sws_scale(swsContext, srcs, strides, 0, size[1], frame->data, frame->linesize);
 	// Send frame.
