@@ -121,6 +121,9 @@ void writeFrameToVideo(std::vector<GLubyte>* buffer, const glm::ivec2 size, bool
 	} else if(res < 0){
 		std::cerr << "[VIDEO]: Unable to send frame " << (frame->pts + 1) << "." << std::endl;
 	}
+	// A frame left waiting in the encoder's input makes the final
+	// avcodec_send_frame(nullptr) in endVideo fail with EAGAIN, and that frame is never written.
+	recorder->flush();
 #endif
 }
 
