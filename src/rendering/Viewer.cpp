@@ -58,6 +58,10 @@ Viewer::Viewer(const Configuration& config) :
 		GL_RGBA, GL_UNSIGNED_BYTE, GL_LINEAR, GL_CLAMP_TO_EDGE));
 	_blurFramebuffer1 = std::shared_ptr<Framebuffer>(new Framebuffer(renderSize[0], renderSize[1],
 		GL_RGBA, GL_UNSIGNED_BYTE, GL_LINEAR, GL_CLAMP_TO_EDGE));
+	_shadowFramebuffer0 = std::shared_ptr<Framebuffer>(new Framebuffer(renderSize[0], renderSize[1],
+		GL_RGBA, GL_UNSIGNED_BYTE, GL_LINEAR, GL_CLAMP_TO_EDGE));
+	_shadowFramebuffer1 = std::shared_ptr<Framebuffer>(new Framebuffer(renderSize[0], renderSize[1],
+		GL_RGBA, GL_UNSIGNED_BYTE, GL_LINEAR, GL_CLAMP_TO_EDGE));
 	_renderFramebuffer = std::shared_ptr<Framebuffer>(new Framebuffer(renderSize[0], renderSize[1],
 	GL_RGBA, GL_UNSIGNED_BYTE, GL_LINEAR, GL_CLAMP_TO_EDGE));
 	_finalFramebuffer = std::shared_ptr<Framebuffer>(new Framebuffer(renderSize[0], renderSize[1],
@@ -65,6 +69,8 @@ Viewer::Viewer(const Configuration& config) :
 
 	_backgroundTexture.init("backgroundtexture_frag", "backgroundtexture_vert");
 	_blurringScreen.init(_particlesFramebuffer->textureId(), "particlesblur_frag");
+	_shadowBlur.init("shadowblur_frag");
+	_shadowScreen.init("shadow_frag");
 	_fxaa.init("fxaa_frag");
 	_passthrough.init("screenquad_frag");
 
@@ -109,6 +115,10 @@ Viewer::Viewer(const Configuration& config) :
 	_layers[Layer::WAVE].name = "Waves";
 	_layers[Layer::WAVE].draw = &Viewer::drawWaves;
 
+	_layers[Layer::SHADOW].type = Layer::SHADOW;
+	_layers[Layer::SHADOW].name = "Notes shadow";
+	_layers[Layer::SHADOW].draw = &Viewer::drawShadow;
+
 	// Register state.
 	_layers[Layer::BGTEXTURE].toggle = &_state.background.image;
 	_layers[Layer::BLUR].toggle = &_state.showBlur;
@@ -119,6 +129,7 @@ Viewer::Viewer(const Configuration& config) :
 	_layers[Layer::FLASHES].toggle = &_state.showFlashes;
 	_layers[Layer::PEDAL].toggle = &_state.showPedal;
 	_layers[Layer::WAVE].toggle = &_state.showWave;
+	_layers[Layer::SHADOW].toggle = &_state.showShadow;
 
 	// Check setup errors.
 	checkGLError();
@@ -245,6 +256,10 @@ void Viewer::drawScene(bool transparentBG){
 		blurPrepass();
 	}
 
+	if (_state.showShadow && _state.showNotes) {
+		shadowPrepass();
+	}
+
 	// Set viewport
 	_renderFramebuffer->bind();
 	glViewport(0, 0, _renderFramebuffer->_width, _renderFramebuffer->_height);
@@ -321,6 +336,44 @@ void Viewer::blurPrepass() {
 	_blurringScreen.draw(_blurFramebuffer0->textureId(), 1.0f, invBlurSize1);
 	_blurFramebuffer1->unbind();
 
+}
+
+void Viewer::shadowPrepass() {
+	const glm::vec2 invSizeS = 1.0f / glm::vec2(_shadowFramebuffer0->_width, _shadowFramebuffer0->_height);
+	glViewport(0, 0, _shadowFramebuffer0->_width, _shadowFramebuffer0->_height);
+	glDisable(GL_BLEND);
+
+	// The notes' own alpha is the mask, so they are drawn over nothing.
+	_shadowFramebuffer0->bind();
+	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+	glClear(GL_COLOR_BUFFER_BIT);
+	_renderer.drawNotes(_scene, _timer * _state.scrollSpeed, invSizeS, _state.notes, _state.reverseScroll, false);
+	_shadowFramebuffer0->unbind();
+
+	// Separable gaussian, horizontal then vertical, the 'time' uniform picking the direction.
+	ShaderProgram& blurProg = _shadowBlur.program();
+	blurProg.use();
+	blurProg.uniform("sigma", _state.shadow.size * float(_shadowFramebuffer0->_height));
+	_shadowFramebuffer1->bind();
+	_shadowBlur.draw(_shadowFramebuffer0->textureId(), 0.0f, invSizeS);
+	_shadowFramebuffer1->unbind();
+	_shadowFramebuffer0->bind();
+	_shadowBlur.draw(_shadowFramebuffer1->textureId(), 1.0f, invSizeS);
+	_shadowFramebuffer0->unbind();
+}
+
+void Viewer::drawShadow(const glm::vec2 &) {
+	if (!_state.showNotes) {
+		return;
+	}
+	glEnable(GL_BLEND);
+	ShaderProgram& shadowProg = _shadowScreen.program();
+	shadowProg.use();
+	shadowProg.uniform("shadowColor", _state.shadow.color);
+	shadowProg.uniform("opacity", _state.shadow.opacity);
+	shadowProg.uniform("offset", _state.shadow.offset);
+	_shadowScreen.draw(_shadowFramebuffer0->textureId(), _timer);
+	glDisable(GL_BLEND);
 }
 
 void Viewer::drawBackgroundImage(const glm::vec2 &) {
@@ -595,6 +648,10 @@ SystemAction Viewer::drawGUI(const float currentTime) {
 
 		if(_state.showWave && ImGui::CollapsingHeader("Wave##HEADER")){
 			showWaveOptions();
+		}
+
+		if(_state.showShadow && ImGui::CollapsingHeader("Shadow##HEADER")){
+			showShadowOptions();
 		}
 
 		if (_state.showScore && ImGui::CollapsingHeader("Score##HEADER")) {
@@ -1147,6 +1204,32 @@ void Viewer::showPedalOptions(){
 	}
 	ImGui::helpTooltip("Define images to use for each pedal and their layout");
 
+}
+
+void Viewer::showShadowOptions(){
+	ImGuiPushItemWidth(25);
+	ImGui::ColorEdit3("Color##Shadow", &_state.shadow.color[0], ImGuiColorEditFlags_NoInputs);
+	ImGui::helpTooltip(s_color_shadow_dsc);
+	ImGui::PopItemWidth();
+
+	ImGuiPushItemWidth(100);
+	ImGuiSameLine(COLUMN_SIZE);
+	if(ImGui::SliderPercent("Opacity##Shadow", &_state.shadow.opacity, 0.0f, 1.0f)){
+		_state.shadow.opacity = glm::clamp(_state.shadow.opacity, 0.0f, 1.0f);
+	}
+	ImGui::helpTooltip(s_shadow_opacity_dsc);
+
+	if(ImGui::SliderFloat("Size##Shadow", &_state.shadow.size, 0.0f, 0.1f, "%.3f")){
+		_state.shadow.size = glm::clamp(_state.shadow.size, 0.0f, 0.1f);
+		updateSizes();
+	}
+	ImGui::helpTooltip(s_shadow_size_dsc);
+	ImGuiSameLine(COLUMN_SIZE);
+	if(ImGui::SliderFloat("Offset##Shadow", &_state.shadow.offset, -0.1f, 0.1f, "%.3f")){
+		_state.shadow.offset = glm::clamp(_state.shadow.offset, -0.1f, 0.1f);
+	}
+	ImGui::helpTooltip(s_shadow_offset_dsc);
+	ImGui::PopItemWidth();
 }
 
 void Viewer::showWaveOptions(){
@@ -2196,6 +2279,12 @@ void Viewer::updateSizes(){
 	_particlesFramebuffer->resize(currentQuality.particlesResolution * baseRes);
 	_blurFramebuffer0->resize(currentQuality.blurResolution * baseRes);
 	_blurFramebuffer1->resize(currentQuality.blurResolution * baseRes);
+	// The shadow is blurred anyway, so it is drawn at up to a quarter of the
+	// resolution, but never so low that a small blur shows the pixels.
+	const glm::vec2 finalRes = currentQuality.finalResolution * baseRes;
+	const float shadowDownscale = glm::clamp(0.5f * _state.shadow.size * finalRes[1], 1.0f, 4.0f);
+	_shadowFramebuffer0->resize(finalRes / shadowDownscale);
+	_shadowFramebuffer1->resize(finalRes / shadowDownscale);
 	_renderFramebuffer->resize(currentQuality.finalResolution * baseRes);
 	_finalFramebuffer->resize(currentQuality.finalResolution * baseRes);
 	_recorder.setSize(glm::ivec2(_finalFramebuffer->_width, _finalFramebuffer->_height));
@@ -2244,6 +2333,7 @@ void Viewer::setState(const State & state){
 	_layers[Layer::FLASHES].toggle = &_state.showFlashes;
 	_layers[Layer::PEDAL].toggle = &_state.showPedal;
 	_layers[Layer::WAVE].toggle = &_state.showWave;
+	_layers[Layer::SHADOW].toggle = &_state.showShadow;
 
 	// Update split notes.
 	if(_scene){

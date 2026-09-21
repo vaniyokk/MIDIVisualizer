@@ -149,6 +149,13 @@ public:
 		float noiseSize;
 	};
 
+	struct ShadowState {
+		glm::vec3 color;
+		float opacity;
+		float size; ///< Blur radius, as a fraction of the screen height.
+		float offset; ///< Downward offset, as a fraction of the screen height.
+	};
+
 	struct NotesState {
 		std::vector<std::string> majorImagePath; ///< Path to major notes background texture.
 		std::vector<std::string> minorImagePath; ///< Path to minor notes background texture.
@@ -187,6 +194,7 @@ public:
 	SetOptions setOptions;
 	PedalsState pedals;
 	WaveState waves;
+	ShadowState shadow;
 	NotesState notes;
 	FlashesState flashes;
 	// TODO: (MV) Regroup common state to pass to rendering functions.
@@ -213,6 +221,7 @@ public:
 	bool perSetColors;
 	bool showPedal;
 	bool showWave;
+	bool showShadow;
 	bool applyAA;
 	bool reverseScroll;
 	bool horizontalScroll;

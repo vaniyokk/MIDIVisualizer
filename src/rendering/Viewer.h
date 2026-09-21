@@ -73,7 +73,7 @@ private:
 	struct Layer {
 		
 		enum Type : unsigned int {
-			BGCOLOR = 0, BGTEXTURE, BLUR, ANNOTATIONS, KEYBOARD, PARTICLES, NOTES, FLASHES, PEDAL, WAVE, COUNT
+			BGCOLOR = 0, BGTEXTURE, BLUR, ANNOTATIONS, KEYBOARD, PARTICLES, NOTES, FLASHES, PEDAL, WAVE, SHADOW, COUNT
 		};
 
 		Type type = BGCOLOR;
@@ -85,9 +85,13 @@ private:
 
 	void blurPrepass();
 
+	void shadowPrepass();
+
 	void drawBackgroundImage(const glm::vec2 & invSize);
 
 	void drawBlur(const glm::vec2 & invSize);
+
+	void drawShadow(const glm::vec2 & invSize);
 
 	void drawParticles(const glm::vec2 & invSize);
 
@@ -120,6 +124,8 @@ private:
 	void showPedalOptions();
 	
 	void showWaveOptions();
+
+	void showShadowOptions();
 
 	void showBlurOptions();
 
@@ -187,11 +193,15 @@ private:
 	std::shared_ptr<Framebuffer> _particlesFramebuffer;
 	std::shared_ptr<Framebuffer> _blurFramebuffer0;
 	std::shared_ptr<Framebuffer> _blurFramebuffer1;
+	std::shared_ptr<Framebuffer> _shadowFramebuffer0;
+	std::shared_ptr<Framebuffer> _shadowFramebuffer1;
 	std::shared_ptr<Framebuffer> _renderFramebuffer;
 	std::shared_ptr<Framebuffer> _finalFramebuffer;
 
 	std::shared_ptr<MIDIScene> _scene;
 	ScreenQuad _blurringScreen;
+	ScreenQuad _shadowBlur;
+	ScreenQuad _shadowScreen;
 	ScreenQuad _passthrough;
 	ScreenQuad _backgroundTexture;
 	ScreenQuad _fxaa;

@@ -186,7 +186,7 @@ void State::defineOptions(){
 
 	// Effects
 	_sharedInfos[s_layers_key] 			= {Category::EFFECTS, s_layers_dsc, Type::OTHER};
-	_sharedInfos[s_layers_key].values 	= "values: bg-color: 0, bg-texture: 1, blur: 2, score: 3, keyboard: 4, particles: 5, notes: 6, flashes: 7, pedal: 8, wave: 9";
+	_sharedInfos[s_layers_key].values 	= "values: bg-color: 0, bg-texture: 1, blur: 2, score: 3, keyboard: 4, particles: 5, notes: 6, flashes: 7, pedal: 8, wave: 9, shadow: 10";
 	_sharedInfos[s_show_particles_key] 	= {Category::EFFECTS, s_show_particles_dsc, Type::BOOLEAN};
 	_sharedInfos[s_show_flashes_key] 	= {Category::EFFECTS, s_show_flashes_dsc, Type::BOOLEAN};
 	_sharedInfos[s_show_blur_key] 		= {Category::EFFECTS, s_show_blur_dsc, Type::BOOLEAN};
@@ -195,6 +195,7 @@ void State::defineOptions(){
 	_sharedInfos[s_show_notes_key] 		= {Category::EFFECTS, s_show_notes_dsc, Type::BOOLEAN};
 	_sharedInfos[s_show_pedal_key] 		= {Category::EFFECTS, s_show_pedal_dsc, Type::BOOLEAN};
 	_sharedInfos[s_show_wave_key] 		= {Category::EFFECTS, s_show_wave_dsc, Type::BOOLEAN};
+	_sharedInfos[s_show_shadow_key] 	= {Category::EFFECTS, s_show_shadow_dsc, Type::BOOLEAN};
 
 	// Notes
 	_sharedInfos[s_notes_major_img_scroll_key] 		= {Category::NOTES, s_notes_major_img_scroll_dsc, Type::BOOLEAN};
@@ -204,6 +205,10 @@ void State::defineOptions(){
 	_sharedInfos[s_notes_edge_width_key] 			= {Category::NOTES, s_notes_edge_width_dsc, Type::FLOAT, {0.0f, 1.0f}};
 	_sharedInfos[s_notes_edge_intensity_key] 		= {Category::NOTES, s_notes_edge_intensity_dsc, Type::FLOAT, {0.0f, 100.0f}};
 	_sharedInfos[s_notes_corner_radius_key]  		= {Category::NOTES, s_notes_corner_radius_dsc, Type::FLOAT, {0.0f, 1.0f}};
+	_sharedInfos[s_shadow_opacity_key] 				= {Category::NOTES, s_shadow_opacity_dsc, Type::FLOAT, {0.0f, 1.0f}};
+	_sharedInfos[s_shadow_size_key] 				= {Category::NOTES, s_shadow_size_dsc, Type::FLOAT, {0.0f, 0.1f}};
+	_sharedInfos[s_shadow_offset_key] 				= {Category::NOTES, s_shadow_offset_dsc, Type::FLOAT, {-0.1f, 0.1f}};
+	_sharedInfos[s_color_shadow_key] 				= {Category::NOTES, s_color_shadow_dsc, Type::COLOR};
 	_sharedInfos[s_notes_major_img_scale_key]   	= {Category::NOTES, s_notes_major_img_scale_dsc, Type::FLOAT};
 	_sharedInfos[s_notes_major_img_intensity_key]	= {Category::NOTES, s_notes_major_img_intensity_dsc, Type::FLOAT, {0.0, 1.0f}};
 	_sharedInfos[s_notes_minor_img_scale_key]   	= {Category::NOTES, s_notes_minor_img_scale_dsc, Type::FLOAT};
@@ -408,6 +413,11 @@ void State::updateOptions(){
 	_floatInfos[s_notes_edge_width_key] = &notes.edgeWidth;
 	_floatInfos[s_notes_edge_intensity_key] = &notes.edgeBrightness;
 	_floatInfos[s_notes_corner_radius_key] = &notes.cornerRadius;
+	_boolInfos[s_show_shadow_key] = &showShadow;
+	_floatInfos[s_shadow_opacity_key] = &shadow.opacity;
+	_floatInfos[s_shadow_size_key] = &shadow.size;
+	_floatInfos[s_shadow_offset_key] = &shadow.offset;
+	_vecInfos[s_color_shadow_key] = &shadow.color;
 	_floatInfos[s_notes_major_img_scale_key] = &notes.majorTexScale;
 	_floatInfos[s_notes_major_img_intensity_key] = &notes.majorTexAlpha;
 	_floatInfos[s_notes_minor_img_scale_key] = &notes.minorTexScale;
@@ -883,9 +893,9 @@ void State::reset(){
 	keyboard.size = 0.25f;
 	keyboard.minorHeight = 0.6f;
 
-	for (int i = 0; i < layersMap.size(); ++i) {
-		layersMap[i] = i;
-	}
+	// The shadow layer came last and has the last index, but it falls onto the
+	// background image, so it is drawn right after it.
+	layersMap = { 0, 1, 10, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15 };
 
 	setOptions = SetOptions();
 
@@ -938,6 +948,12 @@ void State::reset(){
 	waves.speed = 1.0f;
 	waves.noiseIntensity = 1.0f;
 	waves.noiseSize = 0.03f;
+
+	showShadow = false;
+	shadow.color = glm::vec3(0.0f);
+	shadow.opacity = 0.5f;
+	shadow.size = 0.02f;
+	shadow.offset = 0.02f;
 
 	applyAA = false;
 	reverseScroll = false;

@@ -84,6 +84,9 @@ constexpr const char* s_show_pedal_dsc 						= "Display the pedals indicator";
 constexpr const char* s_show_wave_key 						= "show-wave";
 constexpr const char* s_show_wave_dsc 						= "Display the wave effect along the top of the keyboard";
 
+constexpr const char* s_show_shadow_key 					= "show-shadow";
+constexpr const char* s_show_shadow_dsc 					= "Cast a shadow from the notes onto the layers drawn before it";
+
 constexpr const char* s_notes_major_img_scroll_key 			= "notes-major-img-scroll";
 constexpr const char* s_notes_major_img_scroll_dsc 			= "Should the major notes texture scroll with the notes";
 
@@ -104,6 +107,18 @@ constexpr const char* s_notes_edge_intensity_dsc 			= "Control the intensity of 
 
 constexpr const char* s_notes_corner_radius_key 			= "notes-corner-radius";
 constexpr const char* s_notes_corner_radius_dsc  			= "Rounding radius of the notes corners";
+
+constexpr const char* s_shadow_opacity_key 					= "shadow-opacity";
+constexpr const char* s_shadow_opacity_dsc 					= "Opacity of the notes shadow";
+
+constexpr const char* s_shadow_size_key 					= "shadow-size";
+constexpr const char* s_shadow_size_dsc 					= "Blur radius of the notes shadow, as a fraction of the screen height";
+
+constexpr const char* s_shadow_offset_key 					= "shadow-offset";
+constexpr const char* s_shadow_offset_dsc 					= "Downward offset of the notes shadow, as a fraction of the screen height";
+
+constexpr const char* s_color_shadow_key 					= "color-shadow";
+constexpr const char* s_color_shadow_dsc 					= "Notes shadow color";
 
 constexpr const char* s_notes_major_img_scale_key 			= "notes-major-img-scale";
 constexpr const char* s_notes_major_img_scale_dsc   		= "Scale of the texture applied to major notes";
